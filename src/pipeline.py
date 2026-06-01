@@ -23,11 +23,12 @@ async def _scrape_fiche_light(url_fiche: str) -> FicheLight:
     """Adapter : utilise fetch_photos_from_html (déterministe, sans LLM).
     Les champs structurés (espaces / promotions / ambiances) restent vides en v1 :
     le scoring déterministe les tolère et applique des défauts conservateurs."""
-    photo_tuples, video_url = await fetch_photos_from_html(url_fiche)
-    # photo_tuples = [(id, url), ...]
+    # Le scraper renvoie 4 valeurs malgré son type hint (legacy) :
+    # (photos, video_url, nom_lieu, adresse_complete)
+    photo_tuples, video_url, scraped_nom, _adresse = await fetch_photos_from_html(url_fiche)
     photos = [url for _, url in photo_tuples]
-    # nom déduit du slug d'URL (heuristique simple)
-    nom = url_fiche.rstrip("/").split("/")[-1].split("-", 1)[-1].replace("-", " ").title() or "Fiche Privateaser"
+    nom = scraped_nom or url_fiche.rstrip("/").split("/")[-1].split("-", 1)[-1].replace("-", " ").title()
+    nom = nom or "Fiche Privateaser"
     return FicheLight(
         nom=nom,
         slug=_slugify(nom),
