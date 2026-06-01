@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Audit Light · {{ result.fiche.nom }}</title>
+  <style>
+    :root {
+      --inkblue: #3226C0;
+      --orange80: #FDAB86;
+      --gray-100: #F4F4F4;
+      --gray-700: #4A4A4A;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      max-width: 720px; margin: 32px auto; padding: 24px;
+      color: var(--gray-700); line-height: 1.5;
+    }
+    h1, h2, h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--inkblue);
+    }
+    h1 { font-size: 28px; margin: 0 0 4px; }
+    h2 { font-size: 20px; margin: 32px 0 12px; }
+    .meta { color: var(--gray-700); font-size: 14px; margin-bottom: 24px; }
+    .score-banner {
+      background: var(--inkblue); color: white;
+      border-radius: 12px; padding: 24px; display: flex;
+      align-items: center; gap: 24px;
+    }
+    .score-number {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 56px; font-weight: 700; line-height: 1;
+    }
+    .grade {
+      background: var(--orange80); color: var(--inkblue);
+      padding: 6px 14px; border-radius: 8px; font-weight: 700;
+    }
+    .block {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 10px 0; border-bottom: 1px solid var(--gray-100);
+    }
+    .block-points { font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
+    .action {
+      background: var(--gray-100); border-radius: 12px;
+      padding: 16px; margin-bottom: 12px;
+    }
+    .action-titre { font-weight: 700; color: var(--inkblue); margin-bottom: 4px; }
+    .footer { margin-top: 40px; font-size: 12px; color: var(--gray-700); text-align: center; }
+    a { color: var(--inkblue); }
+  </style>
+</head>
+<body>
+  <h1>Audit Light · {{ result.fiche.nom }}</h1>
+  <div class="meta">
+    <a href="{{ result.fiche.url }}">{{ result.fiche.url }}</a><br>
+    {{ "%.1f"|format(result.duration_seconds) }} s · ${{ "%.3f"|format(result.cost_estimate_usd) }}
+  </div>
+
+  <div class="score-banner">
+    <div class="score-number">{{ result.score }}<span style="font-size:24px;opacity:.6">/100</span></div>
+    <div>
+      <span class="grade">{{ result.grade }}</span>
+      <div style="margin-top:8px;opacity:.85">Diagnostic flash en {{ result.actions|length }} priorités</div>
+    </div>
+  </div>
+
+  <h2>Score par bloc</h2>
+  {% for b in result.blocks %}
+    <div class="block">
+      <div>
+        <strong>{{ b.section }}</strong>
+        <div style="font-size:13px">{{ b.commentaire }}</div>
+      </div>
+      <div class="block-points">{{ "%.0f"|format(b.points) }}/{{ b.points_max }}</div>
+    </div>
+  {% endfor %}
+
+  <h2>Priorités d'action</h2>
+  {% for a in result.actions %}
+    <div class="action">
+      <div class="action-titre">{{ a.titre }}</div>
+      <div>{{ a.description }}</div>
+      {% if a.section %}<div style="font-size:12px;opacity:.6;margin-top:6px">{{ a.section }}</div>{% endif %}
+    </div>
+  {% endfor %}
+
+  <div class="footer">
+    Joy Audit Light · {{ result.fiche.nom }}
+    {% if full_audit_base_url %}· <a href="{{ full_audit_base_url }}">Audit complet</a>{% endif %}
+  </div>
+</body>
+</html>
