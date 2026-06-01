@@ -32,6 +32,23 @@ class Action(BaseModel):
     section: str = ""
 
 
+class Espace(BaseModel):
+    """Un espace réservable (issu de booking_options_data_aggregated)."""
+    nom: str
+    capa_min: int = 0
+    capa_max: int = 0
+    condition_reservation: str = ""
+    instant_booking_enabled: bool = False
+
+
+class Promotion(BaseModel):
+    """Une promo affichée (enabled_promotions + happy_hours)."""
+    titre: str
+    conditions: str = ""
+    fenetre: Optional[str] = None
+    nb_min: Optional[int] = None
+
+
 class FicheLight(BaseModel):
     """Fiche Privateaser allégée (juste ce dont on a besoin pour scorer)."""
     nom: str
@@ -41,17 +58,24 @@ class FicheLight(BaseModel):
     capa_max: Optional[int] = None
     nb_photos: int = 0
     photos: list[str] = Field(default_factory=list)
+    video_url: Optional[str] = None
     nb_avis_privateaser: int = 0
+    note_privateaser: Optional[float] = None
     edito_principal: Optional[str] = None
     atout_signature: Optional[str] = None
     has_video: bool = False
     has_pdf_carte: bool = False
     horaire_fin: Optional[str] = None
+    gamme: Optional[str] = None
     occasions_cochees: list[str] = Field(default_factory=list)
     possibilite_danser: bool = False
+    possibilite_danser_detail: Optional[str] = None
     ambiances_cochees: list[str] = Field(default_factory=list)
-    espaces: list[dict] = Field(default_factory=list)
-    promotions: list[dict] = Field(default_factory=list)
+    equipements_services: list[str] = Field(default_factory=list)
+    apports_autorises: list[str] = Field(default_factory=list)
+    selections: list[str] = Field(default_factory=list)
+    espaces: list[Espace] = Field(default_factory=list)
+    promotions: list[Promotion] = Field(default_factory=list)
     permanently_closed: bool = False
 
 

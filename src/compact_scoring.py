@@ -88,10 +88,10 @@ def score_conditions_promo(fiche: FicheLight) -> ScoreBlock:
     # G93 — sur devis
     sur_devis = [
         e for e in fiche.espaces
-        if re.search(r"sur\s*devis|on\s*estimate|presupuesto", (e.get("condition_reservation") or ""), re.I)
+        if re.search(r"sur\s*devis|on\s*estimate|presupuesto", e.condition_reservation or "", re.I)
     ]
     if sur_devis:
-        petit = [e for e in sur_devis if (e.get("capa_max") or 0) <= 25]
+        petit = [e for e in sur_devis if e.capa_max <= 25]
         if petit:
             pts -= 3
             notes.append(f"{len(petit)} petit(s) espace(s) en sur devis (friction).")
@@ -101,18 +101,17 @@ def score_conditions_promo(fiche: FicheLight) -> ScoreBlock:
 
     # G60 — promo
     promos = fiche.promotions or []
-    group_promo = any(_GROUP_PROMO_RE.search(f"{p.get('titre','')} {p.get('conditions','')}") for p in promos)
+    group_promo = any(_GROUP_PROMO_RE.search(f"{p.titre} {p.conditions}") for p in promos)
     if not promos:
         pts -= 3
         notes.append("Aucune promo ni HH affiché.")
     elif not group_promo:
-        # check HH large
         hh_hours = 0.0
         hh_late = False
         for p in promos:
-            if "happy" not in (p.get("titre", "")).lower():
+            if "happy" not in p.titre.lower():
                 continue
-            fen = (p.get("fenetre") or p.get("conditions") or "")
+            fen = p.fenetre or p.conditions or ""
             hours = [int(x) for x in re.findall(r"\d{1,2}", fen)]
             if len(hours) >= 2:
                 start, end = hours[0], hours[-1]

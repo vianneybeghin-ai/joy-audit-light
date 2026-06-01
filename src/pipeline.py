@@ -6,7 +6,8 @@ import time
 
 from .compact_schemas import AuditLightResult, FicheLight, GBPData, PhotoTag
 from .compact_scoring import compute_score_blocks, grade_from_score
-from .fiche_links import extract_fiche_links
+from .fiche_links import fetch_rendered_html_and_links
+from .fiche_parser import parse_fiche_html
 from .gbp import count_group_reviews, extract_place_id, fetch_gbp_data
 from .privateaser_scraper import fetch_photos_from_html
 from .steps_light import sample_photos, step3_light_vision, step4_light_scoring
@@ -19,32 +20,32 @@ def _slugify(name: str) -> str:
     return s or "audit"
 
 
+async def _enrich_with_photos(fiche: FicheLight) -> None:
+    """Complète la fiche avec photos + vidéo via fetch_photos_from_html (httpx)."""
+    photo_tuples, video_url, _scraped_nom, _adresse = await fetch_photos_from_html(fiche.url)
+    fiche.photos = [url for _, url in photo_tuples]
+    fiche.nb_photos = len(fiche.photos)
+    fiche.video_url = video_url
+    fiche.has_video = bool(video_url)
+
+
 async def _scrape_fiche_light(url_fiche: str) -> FicheLight:
-    """Adapter : utilise fetch_photos_from_html (déterministe, sans LLM).
-    Les champs structurés (espaces / promotions / ambiances) restent vides en v1 :
-    le scoring déterministe les tolère et applique des défauts conservateurs."""
-    # Le scraper renvoie 4 valeurs malgré son type hint (legacy) :
-    # (photos, video_url, nom_lieu, adresse_complete)
-    photo_tuples, video_url, scraped_nom, _adresse = await fetch_photos_from_html(url_fiche)
-    photos = [url for _, url in photo_tuples]
-    nom = scraped_nom or url_fiche.rstrip("/").split("/")[-1].split("-", 1)[-1].replace("-", " ").title()
-    nom = nom or "Fiche Privateaser"
-    return FicheLight(
-        nom=nom,
-        slug=_slugify(nom),
-        url=url_fiche,
-        nb_photos=len(photos),
-        photos=photos,
-        has_video=bool(video_url),
+    """Utilisé par les tests : récupère HTML rendu + parse + enrich photos.
+    N'inclut pas l'appel Places API ni les steps LLM."""
+    html, _links = await fetch_rendered_html_and_links(url_fiche)
+    fiche = parse_fiche_html(html, url_fiche) if html else FicheLight(
+        nom="Fiche Privateaser", slug="audit", url=url_fiche,
     )
+    await _enrich_with_photos(fiche)
+    return fiche
 
 
 async def run_audit_light(url_fiche: str) -> AuditLightResult:
     cost_ledger = {"total": 0.0}
     t0 = time.time()
 
-    # Step 1 — fiche_links + Places API (déterministe)
-    links = await extract_fiche_links(url_fiche)
+    # Step 1+2 — 1 seul Playwright pour le HTML rendu, parsing JSON-first, photos httpx
+    html, links = await fetch_rendered_html_and_links(url_fiche)
     place_id = extract_place_id(links.get("google_maps"))
     gbp_raw = await fetch_gbp_data(place_id) if place_id else None
     gbp = None
@@ -56,8 +57,10 @@ async def run_audit_light(url_fiche: str) -> AuditLightResult:
             permanently_closed=gbp_raw.get("permanently_closed", False),
         )
 
-    # Step 2 — parsing fiche (déterministe)
-    fiche = await _scrape_fiche_light(url_fiche)
+    fiche = parse_fiche_html(html, url_fiche) if html else FicheLight(
+        nom="Fiche Privateaser", slug="audit", url=url_fiche,
+    )
+    await _enrich_with_photos(fiche)
     if gbp and gbp.permanently_closed:
         fiche.permanently_closed = True
 

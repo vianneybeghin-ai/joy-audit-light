@@ -46,11 +46,31 @@ _SKIP_DOMAINS = (
 )
 
 
-async def extract_fiche_links(url_fiche: str, timeout: float = 15.0) -> dict[str, str | None]:
-    """Récupère le HTML *rendu* via Playwright Chromium et en extrait les liens externes.
-    Retourne {'google_maps': url|None, 'instagram': url|None, ...}."""
+def _extract_links_from_html(html: str) -> dict[str, str | None]:
+    """Applique les regex + sélection du site officiel sur le HTML rendu."""
     out: dict[str, str | None] = {k: None for k in _PATTERNS}
     out["site_officiel"] = None
+    for key, pat in _PATTERNS.items():
+        m = pat.search(html)
+        if m:
+            out[key] = _html_lib.unescape(m.group(0).rstrip('".\',;:)'))
+    for href in re.findall(r'href=["\'](https?://[^"\'<> ]+)', html):
+        d = href.lower()
+        if any(skip in d for skip in _SKIP_DOMAINS):
+            continue
+        out["site_officiel"] = _html_lib.unescape(href)
+        break
+    found = [k for k, v in out.items() if v]
+    logger.info(f"[fiche_links] {len(found)} liens externes rendus : {found}")
+    return out
+
+
+async def fetch_rendered_html_and_links(
+    url_fiche: str, timeout: float = 15.0,
+) -> tuple[str, dict[str, str | None]]:
+    """Un seul appel Playwright : retourne (html_rendu, links_dict).
+    Indispensable pour parse_fiche_html qui lit le JSON injecté côté client.
+    Fail-open : si Chromium plante, retourne ('', {tous None})."""
     try:
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(headless=True)
@@ -59,23 +79,18 @@ async def extract_fiche_links(url_fiche: str, timeout: float = 15.0) -> dict[str
             await page.goto(url_fiche, wait_until="networkidle", timeout=int(timeout * 1000))
             html = await page.content()
             await browser.close()
-
-        for key, pat in _PATTERNS.items():
-            m = pat.search(html)
-            if m:
-                out[key] = _html_lib.unescape(m.group(0).rstrip('".\',;:)'))
-        for href in re.findall(r'href=["\'](https?://[^"\'<> ]+)', html):
-            d = href.lower()
-            if any(skip in d for skip in _SKIP_DOMAINS):
-                continue
-            out["site_officiel"] = _html_lib.unescape(href)
-            break
-
-        found = [k for k, v in out.items() if v]
-        logger.info(f"[fiche_links] {len(found)} liens externes rendus : {found}")
+        return html, _extract_links_from_html(html)
     except Exception as e:
-        logger.warning(f"[fiche_links] extraction Playwright échouée ({e}) — fallback web_search")
-    return out
+        logger.warning(f"[fiche_links] Playwright échoué ({e}) — fallback")
+        empty = {k: None for k in _PATTERNS}
+        empty["site_officiel"] = None
+        return "", empty
+
+
+async def extract_fiche_links(url_fiche: str, timeout: float = 15.0) -> dict[str, str | None]:
+    """API legacy : un seul Playwright, on garde uniquement les links."""
+    _, links = await fetch_rendered_html_and_links(url_fiche, timeout=timeout)
+    return links
 
 
 _PLACE_ID_RE = re.compile(r'query_place_id=([^&"\']+)', re.I)
