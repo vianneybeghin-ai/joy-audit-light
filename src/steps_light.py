@@ -16,7 +16,7 @@ from .compact_schemas import PhotoTag, FicheLight, GBPData, ScoreBlock, Action
 
 logger = logging.getLogger(__name__)
 
-MODEL_SONNET = "claude-sonnet-4-5"
+MODEL_SONNET = "claude-sonnet-4-6"
 
 # Prix au million de tokens
 _PRICE_IN = 3.0 / 1_000_000
